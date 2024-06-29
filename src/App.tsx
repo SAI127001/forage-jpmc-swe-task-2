@@ -8,20 +8,21 @@ import './App.css';
  */
 interface IState {
   data: ServerRespond[],
+  showGraph: boolean
 }
+
+interface IProps {}
 
 /**
  * The parent element of the react app.
  * It renders title, button and Graph react element.
  */
-class App extends Component<{}, IState> {
-  constructor(props: {}) {
+class App extends Component<IProps, IState> {
+  constructor(props: IProps) {
     super(props);
-
     this.state = {
-      // data saves the server responds.
-      // We use this state to parse data down to the child element (Graph) as element property
       data: [],
+      showGraph: false
     };
   }
 
@@ -29,19 +30,42 @@ class App extends Component<{}, IState> {
    * Render Graph react component with state.data parse as property data
    */
   renderGraph() {
-    return (<Graph data={this.state.data}/>)
+    if (this.state.showGraph) {
+      return <Graph data={this.state.data} />;
+    }
+    return null;
   }
 
   /**
    * Get new data from server and update the state with the new data
    */
   getDataFromServer() {
-    DataStreamer.getData((serverResponds: ServerRespond[]) => {
-      // Update the state by creating a new array of data that consists of
-      // Previous data in the state and the new data from server
-      this.setState({ data: [...this.state.data, ...serverResponds] });
-    });
-  }
+  const socket = new WebSocket("ws://localhost:8080");
+
+  // Wait until the WebSocket connection is open before sending data
+  socket.onopen = () => {
+    setInterval(() => {
+      socket.send("getData");
+    }, 100);
+  };
+
+  // Handle incoming messages
+  socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    this.setState({ data: data, showGraph: true });
+  };
+
+  // Handle WebSocket errors
+  socket.onerror = (error) => {
+    console.error("WebSocket error:", error);
+  };
+
+  // Handle WebSocket closing
+  socket.onclose = () => {
+    console.log("WebSocket connection closed");
+  };
+}
+
 
   /**
    * Render the App react component
@@ -54,11 +78,6 @@ class App extends Component<{}, IState> {
         </header>
         <div className="App-content">
           <button className="btn btn-primary Stream-button"
-            // when button is click, our react app tries to request
-            // new data from the server.
-            // As part of your task, update the getDataFromServer() function
-            // to keep requesting the data every 100ms until the app is closed
-            // or the server does not return anymore data.
             onClick={() => {this.getDataFromServer()}}>
             Start Streaming Data
           </button>
